@@ -1,0 +1,50 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# BP local application service
+server/node_modules/
+server/dist/
+server/.env
+
+# BP local models and generated audio
+local-data/
+*.wav
+*.mp3
+
+# BP Python worker
+worker/__pycache__/
+worker/src/__pycache__/
+*.pyc
+
+# BP local Python environment
+worker/.venv/
+
+# BP Python worker configuration
+worker/.env
+
+# Python generated files
+worker/__pycache__/
+worker/src/__pycache__/
+*.pyc

@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+psutil
+python-dotenv
+kokoro>=0.9.4
+soundfile
+misaki[en]
