@@ -1,10 +1,18 @@
-
-import React, { useEffect, useMemo, useRef, useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AnimatePresence,
   motion,
   useReducedMotion,
 } from "framer-motion";
+
+import LocalAudioControls from "./components/audio/LocalAudioControls.jsx";
 
 import {
 analyseStoryDialogue,
@@ -56,10 +64,8 @@ const STORAGE_KEY = "bp-library";
 const LEGACY_STORAGE_KEY =
   "bp-stage-1-library-v1";
 const DATA_VERSION = 5;
- 
 const MAX_IMPORT_FILE_SIZE =
 5 * 1024 * 1024;
- 
 const PAGE_LAYOUT = {
   desktopWidth: 520,
   desktopHeight: 680,
@@ -1606,8 +1612,33 @@ function getPositionText(pages, position) {
     }
   }
 
-  return "";
+    return "";
 }
+
+
+function normalizeTimelineMatchText(
+  value,
+) {
+  return String(
+    value
+    || "",
+  )
+    .replace(
+      /[“”]/g,
+      "\"",
+    )
+    .replace(
+      /[‘’]/g,
+      "'",
+    )
+    .replace(
+      /\s+/g,
+      " ",
+    )
+    .trim()
+    .toLocaleLowerCase();
+}
+
 
 function createNarrationQueue(
   storyText,
@@ -2160,7 +2191,7 @@ function Modal({ title, children, onClose }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 12, scale: 0.98 }}
         onMouseDown={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-3xl border border-white/50 bg-stone-50 p-5 shadow-2xl"
+        className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-white/50 bg-stone-50 p-5 shadow-2xl"
       >
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-stone-900">{title}</h2>
@@ -2865,6 +2896,20 @@ export default function App() {
     useState("idle");
 
   const [
+    localPlaybackStatus,
+    setLocalPlaybackStatus,
+  ] = useState(
+    "idle",
+  );
+
+  const [
+    localTimelinePosition,
+    setLocalTimelinePosition,
+  ] = useState(
+    null,
+  );
+
+  const [
     narrationPosition,
     setNarrationPosition,
   ] = useState(null);
@@ -2908,6 +2953,16 @@ export default function App() {
 
   const narrationPageRef =
     useRef(null);
+
+  const localTimelineMatchIndexRef =
+    useRef(
+      -1,
+    );
+
+  const localTimelinePageRef =
+    useRef(
+      null,
+    );
 
   const [readerPageSize, setReaderPageSize] =
     useState({
@@ -3100,6 +3155,162 @@ const displayedPage =
         ) < 0.7,
     ).length;
 
+  const selectedPassageText =
+    useMemo(
+      () => {
+        if (
+          selectedPosition
+        ) {
+          const selectedText =
+            getPositionText(
+              pages,
+              selectedPosition,
+            );
+
+          if (
+            selectedText
+              .trim()
+          ) {
+            return selectedText;
+          }
+        }
+
+        if (
+          currentPage > 1
+        ) {
+          const visiblePageIndexes =
+            isMobileLayout
+              ? [
+                  currentPage - 2,
+                ]
+              : [
+                  displayedPage - 2,
+                  displayedPage - 1,
+                ];
+
+          const visibleText =
+            visiblePageIndexes
+              .map(
+                (
+                  pageIndex,
+                ) => (
+                  pages[
+                    pageIndex
+                  ]?.text
+                  || ""
+                ),
+              )
+              .filter(
+                Boolean,
+              )
+              .join(
+                "\n\n",
+              )
+              .trim();
+
+          if (visibleText) {
+            return visibleText;
+          }
+        }
+
+        return (
+          activeStory?.text
+          || ""
+        )
+          .slice(
+            0,
+            4000,
+          )
+          .trim();
+      },
+      [
+        activeStory?.text,
+        currentPage,
+        displayedPage,
+        isMobileLayout,
+        pages,
+        selectedPosition,
+      ],
+    );
+
+  const activeChapterText =
+    useMemo(
+      () => {
+        if (
+          !activeStory?.text
+        ) {
+          return "";
+        }
+
+        if (
+          !activeChapter
+        ) {
+          return activeStory.text;
+        }
+
+        const blocks =
+          createStoryBlocks(
+            activeStory.text,
+          );
+
+        const startIndex =
+          blocks.findIndex(
+            (
+              block,
+            ) => (
+              block.id ===
+              activeChapter.blockId
+            ),
+          );
+
+        if (
+          startIndex < 0
+        ) {
+          return activeStory.text;
+        }
+
+        let endIndex =
+          blocks.length;
+
+        for (
+          let index =
+            startIndex + 1;
+          index <
+            blocks.length;
+          index += 1
+        ) {
+          if (
+            isChapterHeading(
+              blocks[index].text,
+            )
+          ) {
+            endIndex =
+              index;
+
+            break;
+          }
+        }
+
+        return blocks
+          .slice(
+            startIndex,
+            endIndex,
+          )
+          .map(
+            (
+              block,
+            ) => block.text,
+          )
+          .join(
+            "\n\n",
+          );
+      },
+      [
+        activeChapter,
+        activeStory?.text,
+      ],
+    );
+
   const narrationPreview = useMemo(() => {
   const position =
     narrationPosition ||
@@ -3164,6 +3375,21 @@ useEffect(() => {
   }
 
   setNarrationStatus("idle");
+
+  setLocalPlaybackStatus(
+    "idle",
+  );
+
+  setLocalTimelinePosition(
+    null,
+  );
+
+  localTimelineMatchIndexRef.current =
+    -1;
+
+  localTimelinePageRef.current =
+    null;
+
   setNarrationPosition(null);
   setNarrationSpeaker(null);
   setNarrationWordPosition(null);
@@ -4257,37 +4483,84 @@ useEffect(() => {
     }
   }
 
-  function goToPage(pageNumber) {
-    if (!activeStory) {
-      return;
-    }
+  const goToPage =
+    useCallback(
+      (
+        pageNumber,
+      ) => {
+        if (!activeStory) {
+          return;
+        }
 
-    const next = Math.min(
-      Math.max(pageNumber, 1),
-      pages.length + 1,
+        const next =
+          Math.min(
+            Math.max(
+              pageNumber,
+              1,
+            ),
+            pages.length + 1,
+          );
+
+        const finalPage =
+          pages.length + 1;
+
+        const automaticStatus =
+          next >= finalPage
+            ? "finished"
+            : next > 1
+              ? "reading"
+              : activeStory
+                  .readingStatus
+                || "unread";
+
+        setData(
+          (
+            current,
+          ) => ({
+            ...current,
+
+            stories:
+              current.stories.map(
+                (
+                  story,
+                ) => (
+                  story.id ===
+                  activeStory.id
+                    ? {
+                        ...story,
+
+                        currentPage:
+                          next,
+
+                        readingStatus:
+                          automaticStatus,
+
+                        updatedAt:
+                          Date.now(),
+                      }
+                    : story
+                ),
+              ),
+          }),
+        );
+
+        setPageInput(
+          "",
+        );
+
+        setSelectionMenu(
+          null,
+        );
+
+        setBookOpen(
+          next > 1,
+        );
+      },
+      [
+        activeStory,
+        pages.length,
+      ],
     );
-
-    const finalPage =
-      pages.length + 1;
-
-    const automaticStatus =
-      next >= finalPage
-        ? "finished"
-        : next > 1
-          ? "reading"
-          : activeStory.readingStatus ||
-            "unread";
-
-    updateStory(activeStory.id, {
-      currentPage: next,
-      readingStatus:
-        automaticStatus,
-    });
-
-    setPageInput("");
-    setSelectionMenu(null);
-    setBookOpen(next > 1);
-  }
 
   function goToEnteredPage() {
     const requestedPage =
@@ -4312,6 +4585,319 @@ useEffect(() => {
     goToPage(safePage);
     setPageInput("");
   }
+
+  const handleLocalTimelineSegmentChange =
+    useCallback(
+      (
+        segment,
+        playbackDetails = {},
+      ) => {
+        if (
+          !segment
+          || !activeStory?.text
+          || pages.length === 0
+        ) {
+          return;
+        }
+
+        const queue =
+          createNarrationQueue(
+            activeStory.text,
+            pages,
+            activeStory.dialogueAnalysis,
+          );
+
+        if (
+          queue.length === 0
+        ) {
+          return;
+        }
+
+        const requestedText =
+          normalizeTimelineMatchText(
+            segment.displayText,
+          );
+
+        if (!requestedText) {
+          return;
+        }
+
+        const previousMatchIndex =
+          localTimelineMatchIndexRef
+            .current;
+
+        const searchStartIndex =
+          Math.max(
+            0,
+            previousMatchIndex,
+          );
+
+        let matchingIndex =
+          -1;
+
+        for (
+          let index =
+            searchStartIndex;
+          index <
+            queue.length;
+          index += 1
+        ) {
+          const queueText =
+            normalizeTimelineMatchText(
+              queue[index].text,
+            );
+
+          if (
+            queueText ===
+            requestedText
+            || queueText.includes(
+              requestedText,
+            )
+            || requestedText.includes(
+              queueText,
+            )
+          ) {
+            matchingIndex =
+              index;
+
+            break;
+          }
+        }
+
+        if (
+          matchingIndex < 0
+        ) {
+          matchingIndex =
+            queue.findIndex(
+              (
+                item,
+              ) => {
+                const queueText =
+                  normalizeTimelineMatchText(
+                    item.text,
+                  );
+
+                return (
+                  queueText ===
+                    requestedText
+                  || queueText.includes(
+                    requestedText,
+                  )
+                  || requestedText.includes(
+                    queueText,
+                  )
+                );
+              },
+            );
+        }
+
+        if (
+          matchingIndex < 0
+        ) {
+          return;
+        }
+
+        localTimelineMatchIndexRef.current =
+          matchingIndex;
+
+        const item =
+          queue[
+            matchingIndex
+          ];
+
+        const position = {
+          blockId:
+            item.blockId,
+
+          sentenceId:
+            item.sentenceId,
+
+          offset:
+            item.startOffset,
+
+          sentenceStartOffset:
+            item.sentenceStartOffset
+            ?? item.startOffset,
+
+          sentenceEndOffset:
+            item.sentenceEndOffset
+            ?? item.endOffset,
+
+          planStartOffset:
+            item.startOffset,
+
+          planEndOffset:
+            item.endOffset,
+
+          narrationItemId:
+            item.id,
+
+          analysisSegmentId:
+            item.analysisSegmentId
+            || null,
+
+          pageNumber:
+            item.pageNumber,
+
+          source:
+            "local-timeline",
+
+          timelineSegmentId:
+            segment.id,
+
+          timelineSegmentIndex:
+            playbackDetails
+              .segmentIndex
+            ?? segment.index
+            ?? null,
+        };
+
+        setLocalTimelinePosition(
+          position,
+        );
+
+        setNarrationPosition(
+          position,
+        );
+
+        setNarrationWordPosition(
+          null,
+        );
+
+        setNarrationSpeaker({
+          type:
+            segment.kind
+            || item.narrationType
+            || "narration",
+
+          speakerId:
+            segment.speakerId
+            || item.speakerId
+            || null,
+
+          speakerName:
+            segment.speakerName
+            || item.speakerName
+            || "Narrator",
+
+          voiceCategory:
+            item.voiceCategory
+            || "narrator",
+
+          preferredVoiceId:
+            item.preferredVoiceId
+            || null,
+
+          timingSource:
+            "local-timeline",
+        });
+
+        if (
+          item.pageNumber
+          && item.pageNumber !==
+            localTimelinePageRef.current
+        ) {
+          localTimelinePageRef.current =
+            item.pageNumber;
+
+          setBookOpen(
+            true,
+          );
+
+          setSelectionMenu(
+            null,
+          );
+
+          goToPage(
+            item.pageNumber,
+          );
+        }
+      },
+      [
+        activeStory?.dialogueAnalysis, activeStory?.text, goToPage, pages,
+      ],
+    );
+
+
+  const handleLocalPlaybackStateChange =
+    useCallback(
+      (
+        nextState,
+      ) => {
+        setLocalPlaybackStatus(
+          nextState,
+        );
+
+        if (
+          nextState ===
+            "playing"
+          || nextState ===
+            "paused"
+          || nextState ===
+            "ready"
+        ) {
+          if (
+            narrationStatus !==
+            "idle"
+        ) {
+            stopNarration();
+          }
+
+          return;
+        }
+
+        if (
+          nextState ===
+            "idle"
+          || nextState ===
+            "completed"
+          || nextState ===
+            "failed"
+        ) {
+          localTimelineMatchIndexRef.current =
+            -1;
+
+          localTimelinePageRef.current =
+            null;
+
+          setLocalTimelinePosition(
+            null,
+          );
+
+          setNarrationPosition(
+            (
+              currentPosition,
+            ) => (
+              currentPosition
+                ?.source ===
+                "local-timeline"
+                  ? null
+                  : currentPosition
+            ),
+          );
+
+          setNarrationSpeaker(
+            (
+              currentSpeaker,
+            ) => (
+              currentSpeaker
+                ?.timingSource ===
+                "local-timeline"
+                  ? null
+                  : currentSpeaker
+            ),
+          );
+
+          setNarrationWordPosition(
+            null,
+          );
+        }
+      },
+      [
+        narrationStatus,
+      ],
+    );
+
 
   function stopNarration() {
     narrationSessionRef.current += 1;
@@ -4669,6 +5255,16 @@ useEffect(() => {
 
     setNarrationError("");
 
+    setLocalTimelinePosition(
+      null,
+    );
+
+    localTimelineMatchIndexRef.current =
+      -1;
+
+    localTimelinePageRef.current =
+      null;
+
     const queue = createNarrationQueue(
       activeStory.text,
       pages,
@@ -4790,6 +5386,17 @@ useEffect(() => {
     }
 
     stopNarration();
+
+    setLocalTimelinePosition(
+      null,
+    );
+
+    localTimelineMatchIndexRef.current =
+      -1;
+
+    localTimelinePageRef.current =
+      null;
+
     setSelectionMenu(null);
 
     const queue = createNarrationQueue(
@@ -7418,7 +8025,7 @@ useEffect(() => {
                   <option value="created-desc">
                     Recently added
                   </option>
-                   
+                  
                   <option value="opened-desc">
                     Recently read
                   </option>
@@ -7820,8 +8427,13 @@ useEffect(() => {
                 size={15}
                 className={
                   narrationStatus === "playing"
+                  || localPlaybackStatus ===
+                    "playing"
                     ? "shrink-0 text-emerald-300"
-                    : narrationStatus === "paused"
+                    : narrationStatus ===
+                        "paused"
+                      || localPlaybackStatus ===
+                        "paused"
                       ? "shrink-0 text-amber-300"
                       : "shrink-0 text-stone-400"
                 }
@@ -7829,11 +8441,20 @@ useEffect(() => {
 
               <span className="min-w-0">
                 <span className="block truncate text-xs text-stone-200">
-                  {narrationStatus !==
-                    "idle" &&
-                  narrationSpeaker?.speakerName
-                    ? `${narrationSpeaker.speakerName} · ${narrationStatusLabel}`
-                    : narrationStatusLabel}
+                  {localPlaybackStatus !==
+                    "idle"
+                    && localTimelinePosition
+                    ? (
+                        `${narrationSpeaker?.speakerName || "Narrator"} · Local ${localPlaybackStatus}`
+                      )
+                    : narrationStatus !==
+                        "idle"
+                      && narrationSpeaker
+                        ?.speakerName
+                      ? (
+                          `${narrationSpeaker.speakerName} · ${narrationStatusLabel}`
+                        )
+                      : narrationStatusLabel}
                 </span>
 
                 <span className="block max-w-[170px] truncate text-[10px] text-stone-500">
@@ -10408,6 +11029,41 @@ useEffect(() => {
           }
         >
           <div className="space-y-5">
+            <LocalAudioControls
+              passageText={
+                selectedPassageText
+              }
+              chapterText={
+                activeChapterText
+              }
+              storyId={
+                activeStory?.id
+                || null
+              }
+              onTimelineSegmentChange={
+                handleLocalTimelineSegmentChange
+              }
+              onLocalPlaybackStateChange={
+                handleLocalPlaybackStateChange
+              }
+              onBrowserFallback={() => {
+                if (
+                  selectedPosition
+                ) {
+                  narrateFromSelection();
+
+                  return;
+                }
+
+                startNarration();
+              }}
+            />
+
+            <div className="border-t border-stone-200 pt-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                Browser narration
+              </p>
+</div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-stone-500">
                 Voice

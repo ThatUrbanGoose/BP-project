@@ -4,7 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run dev:all",
+    "dev:all": "concurrently --kill-others-on-fail --names FRONTEND,NODE,KOKORO,QWEN --prefix-colors cyan,green,yellow,magenta \"npm:dev:frontend\" \"npm:dev:server\" \"npm:dev:kokoro\" \"npm:dev:qwen\"",
+    "dev:frontend": "vite",
+    "dev:server": "cd server && npm run dev",
+    "dev:kokoro": "cd worker && D:/BP-Local/worker/.venv/Scripts/python.exe -m uvicorn src.main:app --host 127.0.0.1 --port 3002 --timeout-graceful-shutdown 10",
+    "dev:qwen": "cd qwen-worker && D:/BP-Local/qwen-worker/.venv/Scripts/python.exe -m uvicorn src.main:app --host 127.0.0.1 --port 3003 --timeout-graceful-shutdown 10",
+    "dev:fast": "concurrently --kill-others-on-fail --names FRONTEND,NODE,KOKORO --prefix-colors cyan,green,yellow \"npm:dev:frontend\" \"npm:dev:server\" \"npm:dev:kokoro\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -22,6 +28,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",

@@ -26,11 +26,20 @@ export async function registerPublicConfigRoute(
         workerStatusEndpoint:
           "/api/worker/status",
 
+        qwenStatusEndpoint:
+          "/api/tts/qwen/status",
+
         availableEngines: [
           {
             id: "kokoro",
             name: "Kokoro-82M",
             mode: "fast",
+          },
+
+          {
+            id: "qwen3-tts",
+            name: "Qwen3-TTS 0.6B",
+            mode: "expressive",
           },
         ],
 

@@ -10,6 +10,22 @@ import {
   environment,
 } from "./config/environment.js";
 
+import {
+  initializeSynthesisCache,
+} from "./services/synthesisCache.js";
+
+import {
+  initializeSynthesisQueue,
+} from "./services/synthesisQueue.js";
+
+import {
+  registerRealSynthesisExecutor,
+} from "./services/synthesisExecutor.js";
+
+import {
+  initializePronunciationStore,
+} from "./services/pronunciationStore.js";
+
 async function createDataDirectories():
 Promise<void> {
   const directories =
@@ -30,6 +46,14 @@ Promise<void> {
 async function startServer():
 Promise<void> {
   await createDataDirectories();
+
+  await initializeSynthesisCache();
+
+  await initializeSynthesisQueue();
+
+  await initializePronunciationStore();
+
+  registerRealSynthesisExecutor();
 
   const app =
     await buildApp();

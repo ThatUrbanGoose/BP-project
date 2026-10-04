@@ -1,0 +1,7 @@
+qwen-tts
+python-dotenv
+psutil
+soundfile
+fastapi
+uvicorn[standard]
+pydantic

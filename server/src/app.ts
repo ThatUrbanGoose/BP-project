@@ -29,6 +29,22 @@ import {
   registerKokoroRoutes,
 } from "./routes/kokoro.js";
 
+import {
+  registerQwenRoutes,
+} from "./routes/qwen.js";
+
+import {
+  registerSynthesisRoutes,
+} from "./routes/synthesis.js";
+
+import {
+  registerSynthesisStorageRoutes,
+} from "./routes/synthesisStorage.js";
+
+import {
+  registerPronunciationRoutes,
+} from "./routes/pronunciations.js";
+
 export async function buildApp():
 Promise<FastifyInstance> {
   const app = Fastify({
@@ -185,7 +201,23 @@ Promise<FastifyInstance> {
    
   await registerKokoroRoutes(
     app,
-  )
+  );
+
+  await registerQwenRoutes(
+    app,
+  );
+
+  await registerSynthesisRoutes(
+    app,
+  );
+
+  await registerSynthesisStorageRoutes(
+    app,
+  );
+   
+  await registerPronunciationRoutes(
+    app,
+  );
 
   return app;
-}
+  }
